@@ -9,7 +9,8 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
+import type { AxiosInstance } from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -61,6 +62,66 @@ const VERIFY_EMAIL_TOOL: Tool = {
   },
 };
 
+const DOMAIN_SEARCH_TOOL: Tool = {
+  name: 'hunter_domain_search',
+  description: 'Find all the email addresses corresponding to a website or company name.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      domain: {
+        type: 'string',
+        description: 'The domain name to search for, e.g. "stripe.com"',
+      },
+      company: {
+        type: 'string',
+        description: 'The company name to search for (alternative to domain)',
+      },
+      limit: {
+        type: 'number',
+        description: 'The maximum number of emails to return (default: 10, max: 100)',
+      },
+      offset: {
+        type: 'number',
+        description: 'The number of emails to skip (default: 0)',
+      },
+      type: {
+        type: 'string',
+        description: 'The type of emails to return (personal or generic)',
+      }
+    },
+    required: [],
+  },
+};
+
+const EMAIL_COUNT_TOOL: Tool = {
+  name: 'hunter_email_count',
+  description: 'Know how many email addresses we have for a domain or a company.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      domain: {
+        type: 'string',
+        description: 'The domain name to get the count for, e.g. "stripe.com"',
+      },
+      company: {
+        type: 'string',
+        description: 'The company name to get the count for (alternative to domain)',
+      }
+    },
+    required: [],
+  },
+};
+
+const ACCOUNT_INFO_TOOL: Tool = {
+  name: 'hunter_account_info',
+  description: 'Get information regarding your Hunter account.',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+    required: [],
+  },
+};
+
 // Type definitions
 interface FindEmailParams {
   domain: string;
@@ -72,6 +133,23 @@ interface FindEmailParams {
 
 interface VerifyEmailParams {
   email: string;
+}
+
+interface DomainSearchParams {
+  domain?: string;
+  company?: string;
+  limit?: number;
+  offset?: number;
+  type?: string;
+}
+
+interface EmailCountParams {
+  domain?: string;
+  company?: string;
+}
+
+interface AccountInfoParams {
+  // No parameters needed
 }
 
 // Type guards
@@ -127,6 +205,112 @@ function isVerifyEmailParams(args: unknown): args is VerifyEmailParams {
     args !== null &&
     'email' in args &&
     typeof (args as { email: unknown }).email === 'string'
+  );
+}
+
+function isDomainSearchParams(args: unknown): args is DomainSearchParams {
+  if (
+    typeof args !== 'object' ||
+    args === null
+  ) {
+    return false;
+  }
+
+  // At least one of domain or company must be provided
+  if (
+    !('domain' in args || 'company' in args)
+  ) {
+    return false;
+  }
+
+  // Check domain if provided
+  if (
+    'domain' in args &&
+    (args as { domain: unknown }).domain !== undefined &&
+    typeof (args as { domain: unknown }).domain !== 'string'
+  ) {
+    return false;
+  }
+
+  // Check company if provided
+  if (
+    'company' in args &&
+    (args as { company: unknown }).company !== undefined &&
+    typeof (args as { company: unknown }).company !== 'string'
+  ) {
+    return false;
+  }
+
+  // Check limit if provided
+  if (
+    'limit' in args &&
+    (args as { limit: unknown }).limit !== undefined &&
+    typeof (args as { limit: unknown }).limit !== 'number'
+  ) {
+    return false;
+  }
+
+  // Check offset if provided
+  if (
+    'offset' in args &&
+    (args as { offset: unknown }).offset !== undefined &&
+    typeof (args as { offset: unknown }).offset !== 'number'
+  ) {
+    return false;
+  }
+
+  // Check type if provided
+  if (
+    'type' in args &&
+    (args as { type: unknown }).type !== undefined &&
+    typeof (args as { type: unknown }).type !== 'string'
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isEmailCountParams(args: unknown): args is EmailCountParams {
+  if (
+    typeof args !== 'object' ||
+    args === null
+  ) {
+    return false;
+  }
+
+  // At least one of domain or company must be provided
+  if (
+    !('domain' in args || 'company' in args)
+  ) {
+    return false;
+  }
+
+  // Check domain if provided
+  if (
+    'domain' in args &&
+    (args as { domain: unknown }).domain !== undefined &&
+    typeof (args as { domain: unknown }).domain !== 'string'
+  ) {
+    return false;
+  }
+
+  // Check company if provided
+  if (
+    'company' in args &&
+    (args as { company: unknown }).company !== undefined &&
+    typeof (args as { company: unknown }).company !== 'string'
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAccountInfoParams(args: unknown): args is AccountInfoParams {
+  return (
+    typeof args === 'object' &&
+    args !== null
   );
 }
 
@@ -240,6 +424,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     FIND_EMAIL_TOOL,
     VERIFY_EMAIL_TOOL,
+    DOMAIN_SEARCH_TOOL,
+    EMAIL_COUNT_TOOL,
+    ACCOUNT_INFO_TOOL,
   ],
 }));
 
@@ -308,6 +495,114 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const response = await withRetry(
             async () => apiClient.get('/email-verifier', { params: args }),
             'verify email'
+          );
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(response.data, null, 2),
+              },
+            ],
+            isError: false,
+          };
+        } catch (error) {
+          const errorMessage = axios.isAxiosError(error)
+            ? `API Error: ${error.response?.data?.message || error.message}`
+            : `Error: ${error instanceof Error ? error.message : String(error)}`;
+
+          return {
+            content: [{ type: 'text', text: errorMessage }],
+            isError: true,
+          };
+        }
+      }
+
+      case 'hunter_domain_search': {
+        if (!isDomainSearchParams(args)) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            'Invalid arguments for hunter_domain_search'
+          );
+        }
+
+        try {
+          // Hunter.io API expects query parameters for domain search
+          const response = await withRetry(
+            async () => apiClient.get('/domain-search', { params: args }),
+            'domain search'
+          );
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(response.data, null, 2),
+              },
+            ],
+            isError: false,
+          };
+        } catch (error) {
+          const errorMessage = axios.isAxiosError(error)
+            ? `API Error: ${error.response?.data?.message || error.message}`
+            : `Error: ${error instanceof Error ? error.message : String(error)}`;
+
+          return {
+            content: [{ type: 'text', text: errorMessage }],
+            isError: true,
+          };
+        }
+      }
+
+      case 'hunter_email_count': {
+        if (!isEmailCountParams(args)) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            'Invalid arguments for hunter_email_count'
+          );
+        }
+
+        try {
+          // Hunter.io API expects query parameters for email count
+          const response = await withRetry(
+            async () => apiClient.get('/email-count', { params: args }),
+            'email count'
+          );
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(response.data, null, 2),
+              },
+            ],
+            isError: false,
+          };
+        } catch (error) {
+          const errorMessage = axios.isAxiosError(error)
+            ? `API Error: ${error.response?.data?.message || error.message}`
+            : `Error: ${error instanceof Error ? error.message : String(error)}`;
+
+          return {
+            content: [{ type: 'text', text: errorMessage }],
+            isError: true,
+          };
+        }
+      }
+
+      case 'hunter_account_info': {
+        if (!isAccountInfoParams(args)) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            'Invalid arguments for hunter_account_info'
+          );
+        }
+
+        try {
+          // Hunter.io API expects query parameters for account info
+          const response = await withRetry(
+            async () => apiClient.get('/account'),
+            'account info'
           );
 
           return {
