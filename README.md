@@ -2,6 +2,10 @@
 
 This is a Model Context Protocol (MCP) server that integrates with the Hunter.io API to provide email finding and verification capabilities.
 
+<a href="https://glama.ai/mcp/servers/@Meerkats-Ai/hunter-io-mcp-server">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@Meerkats-Ai/hunter-io-mcp-server/badge" alt="Hunter.io Server MCP server" />
+</a>
+
 ## Features
 
 - Find email addresses using domain and name information
