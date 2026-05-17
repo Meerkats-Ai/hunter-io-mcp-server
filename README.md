@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/meerkats-ai-hunter-io-mcp-server-badge.png)](https://mseep.ai/app/meerkats-ai-hunter-io-mcp-server)
+
 # Hunter.io MCP Server
 
 This is a Model Context Protocol (MCP) server that integrates with the Hunter.io API to provide email finding and verification capabilities.
